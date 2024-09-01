@@ -1,0 +1,151 @@
+*Prompt-V1*
+**Task:**
+
+1. **Convert Tabular Data to Heterogeneous Graph:**
+   * Take a large tabular dataset with multiple specified node types and edge relationships.
+   * Construct a heterogeneous graph using PyTorch Geometric.
+
+2. **Extract Subgraph Based on Filters:**
+   * Accept user-defined filters to identify relevant subgraphs within the larger graph.
+   * Implement a mechanism to efficiently extract these subgraphs.
+
+3. **Visualize Subgraph:**
+   * If the subgraph is small enough, visualize it directly using an appropriate library (e.g., NetworkX, PyTorch Geometric's built-in visualization if available, or other suitable libraries).
+   * If the subgraph is too large for direct visualization:
+     * Arbitrarily limit the size of the subgraph to a reasonable number of nodes and edges.
+     * Display the limited subgraph with a clear warning indicating that it's a partial view of the original subgraph.
+
+**Considerations:**
+
+* **Efficiency:** Optimize the graph construction and subgraph extraction processes for large datasets.
+* **Flexibility:** Handle various node types, edge relationships, and user-defined filter criteria.
+* **Visualization Clarity:** Ensure the visualizations are clear and informative, even for complex heterogeneous graphs.
+* **User-Friendliness:** Provide intuitive ways for users to specify filters and interact with the visualization.
+
+**Deliverables:**
+
+* **Python code** implementing the above functionality.
+* **Clear explanations** of the code structure and key decisions made during implementation.
+* **Example usage** demonstrating how to use the code with sample data and filters.
+
+**Additional Notes:**
+
+* Feel free to use any suitable libraries or techniques to achieve the desired outcome.
+* Prioritize clarity and efficiency in your code.
+* Include error handling and informative messages to guide the user.
+
+
+*Prompt-V2*
+
+```
+Task: Develop a Python application for heterogeneous graph analysis and visualization
+
+Objective:
+Create a Python application that constructs a heterogeneous graph from tabular data, extracts subgraphs based on user-defined filters, and visualizes the results. The application should use PyTorch Geometric for graph operations and NetworkX for visualization.
+
+Requirements:
+
+1. Data Processing and Graph Construction:
+   - Implement a function to read tabular data from a CSV file.
+   - Create a heterogeneous graph using PyTorch Geometric's HeteroData.
+   - Support multiple node types (e.g., user, product, category) and edge relationships.
+
+2. Subgraph Extraction:
+   - Implement a function to extract subgraphs based on user-defined filters.
+   - Allow filtering on any node type (e.g., users who made more than X purchases).
+   - Ensure the subgraph includes relevant nodes and edges from all connected node types.
+
+3. Visualization:
+   - Use NetworkX to convert the PyTorch Geometric graph to a format suitable for visualization.
+   - Implement a function to visualize the subgraph using matplotlib.
+   - Use different colors for different node and edge types.
+   - Include node labels in the visualization.
+   - Handle cases where the subgraph is too large by limiting the number of nodes displayed.
+
+4. Main Execution:
+   - Demonstrate the full workflow: data loading, graph construction, subgraph extraction, and visualization.
+   - Use example filters to showcase the functionality.
+
+5. Code Structure and Best Practices:
+   - Organize the code into clear, well-documented functions.
+   - Use type hints for better code readability.
+   - Include error handling and informative error messages.
+   - Create a requirements.txt file for easy environment setup.
+
+6. Version Control:
+   - Set up a Git repository for the project.
+   - Include a README.md file with project description and usage instructions.
+
+Additional Considerations:
+- Ensure efficiency in graph construction and subgraph extraction for large datasets.
+- Provide flexibility in defining node types, edge relationships, and filter criteria.
+- Focus on code clarity and maintainability.
+
+Deliverables:
+- Python script(s) implementing the required functionality.
+- requirements.txt file listing all necessary dependencies.
+- README.md file with project overview and usage instructions.
+- Git repository with a clean commit history.
+
+Example Usage:
+Provide a code snippet demonstrating how to use the main functions of the application, including loading data, applying a filter, and visualizing the result.
+```
+
+Prompt-V3: To Extend
+
+Task: Extend the neo-pytorch graph analysis application with advanced filtering and analysis capabilities
+
+Objective:
+Enhance the existing Python application for heterogeneous graph analysis by adding more sophisticated filtering options and analysis features. The goal is to provide users with greater flexibility in exploring the graph data and extracting meaningful insights.
+
+Requirements:
+```
+1. Attribute-based Filtering:
+   - Implement a function to filter nodes based on specific attribute values (e.g., user_id = "U2945").
+   - The function should work with any node type and any attribute.
+   - Integrate this filtering option with the existing subgraph extraction process.
+
+2. Popular Product Analysis:
+   - Develop a function to identify the most popular product in the graph based on the number of purchases.
+   - Create a function to find all users who have purchased a specific product.
+   - Implement visualization for the subgraph of users who bought the most popular product.
+
+3. Multiple Filter Conditions:
+   - Modify the existing subgraph extraction function to support multiple filter conditions for each node type.
+   - Allow for both AND and OR operations between filter conditions.
+   - Ensure that the debug information is updated to reflect multiple conditions.
+
+4. Integration and Usage:
+   - Update the main execution block to demonstrate the use of these new features.
+   - Provide clear examples of how to use each new functionality.
+
+5. Code Structure and Documentation:
+   - Maintain clear function documentation with input/output descriptions and usage examples.
+   - Ensure new functions follow the existing code style and structure.
+   - Update type hints for all new and modified functions.
+
+6. Performance Considerations:
+   - Optimize the new functions for efficiency, especially when dealing with large graphs.
+   - Consider using vectorized operations where possible to improve performance.
+
+7. Error Handling and Edge Cases:
+   - Implement robust error handling for the new functions.
+   - Consider edge cases, such as when no products meet the popularity criteria or when filters result in empty subgraphs.
+
+8. Visualization Enhancements:
+   - If needed, update the visualization function to better represent the results of new analysis features.
+   - Consider adding labels or other visual cues to highlight key information in the graph.
+
+Deliverables:
+- Updated Python script(s) with the new functionalities implemented.
+- Updated README.md file explaining the new features and how to use them.
+- Any necessary updates to the requirements.txt file.
+
+Additional Considerations:
+- Ensure backwards compatibility with existing code where possible.
+- Consider the potential for future extensions and design the new features with flexibility in mind.
+- If any new dependencies are introduced, justify their necessity and document them clearly.
+
+Example Usage:
+Provide code snippets demonstrating how to use each new feature, including attribute-based filtering, popular product analysis, and multiple filter conditions.
+```

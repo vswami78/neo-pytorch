@@ -220,67 +220,7 @@ def extract_subgraph_with_multiple_conditions(graph: HeteroData, filters: Dict[s
 
     return subgraph, debug_info
 
-def run_analysis(data_path: str, node_types: Dict[str, str], edge_types: List[Tuple[str, str, str]]) -> Dict[str, Any]:
-    results = {}
-    
-    # Create heterogeneous graph
-    graph = create_heterogeneous_graph(data_path, node_types, edge_types)
-    
-    # Basic filtering
-    basic_filters = {
-        "user": lambda x: torch.bincount(graph["user", "purchased", "product"].edge_index[0]) > 0
-    }
-    basic_subgraph, basic_debug_info = extract_subgraph(graph, basic_filters)
-    basic_fig, basic_viz_debug_info = visualize_subgraph(basic_subgraph)
-    results['basic_filtering'] = {
-        'node_counts': {nt: basic_subgraph[nt].num_nodes for nt in basic_subgraph.node_types},
-        'debug_info': str(basic_debug_info),
-        'visualization': basic_fig,
-        'visualization_debug_info': str(basic_viz_debug_info)
-    }
-
-    # Advanced filtering
-    advanced_filters = {
-        "user": [
-            lambda x: torch.bincount(graph["user", "purchased", "product"].edge_index[0]) > 2,
-            lambda x: x.user_id != "U4278"
-        ],
-        "product": [
-            lambda x: x.product_id != "P83"
-        ],
-        "category": []
-    }
-    advanced_subgraph, advanced_debug_info = extract_subgraph_with_multiple_conditions(graph, advanced_filters)
-    advanced_fig, advanced_viz_debug_info = visualize_subgraph(advanced_subgraph)
-    results['advanced_filtering'] = {
-        'debug_info': str(advanced_debug_info),
-        'visualization': advanced_fig,
-        'visualization_debug_info': str(advanced_viz_debug_info)
-    }
-
-    # Popular product analysis
-    most_popular_product = find_most_popular_product(graph)
-    users_who_purchased = find_users_who_purchased_product(graph, most_popular_product)
-    results['popular_product_analysis'] = {
-        'most_popular_product': most_popular_product,
-        'users_who_purchased': users_who_purchased
-    }
-    
-    # Visualize subgraph of users who bought the most popular product
-    popular_product_filter = {
-        "user": [lambda x: torch.tensor([uid in users_who_purchased for uid in x.user_id])],
-        "product": [lambda x: x.product_id == most_popular_product]
-    }
-    popular_product_subgraph, popular_product_debug_info = extract_subgraph_with_multiple_conditions(graph, popular_product_filter)
-    popular_product_fig, popular_product_viz_debug_info = visualize_subgraph(popular_product_subgraph)
-    results['popular_product_subgraph'] = {
-        'debug_info': str(popular_product_debug_info),
-        'visualization': popular_product_fig,
-        'visualization_debug_info': str(popular_product_viz_debug_info)
-    }
-
-    return results
-
+# Example usage
 if __name__ == "__main__":
     # Example data and parameters
     data_path = "user-prod-categ.csv"
@@ -294,29 +234,68 @@ if __name__ == "__main__":
         ("product", "belongs_to", "category")
     ]
     
-    # Run analysis
-    analysis_results = run_analysis(data_path, node_types, edge_types)
+    # Create heterogeneous graph
+    graph = create_heterogeneous_graph(data_path, node_types, edge_types)
     
-    # Here you can decide how to handle the results and visualizations
-    # For example:
+    # Basic filtering
+    basic_filters = {
+        "user": lambda x: torch.bincount(graph["user", "purchased", "product"].edge_index[0]) > 0
+    }
+    basic_subgraph, basic_debug_info = extract_subgraph(graph, basic_filters)
+    logger.info(f"Basic subgraph node counts: {[basic_subgraph[nt].num_nodes for nt in basic_subgraph.node_types]}")
+    logger.info(f"Basic filtering debug info:\n{basic_debug_info}")
+
+    fig, fig_debug_info = visualize_subgraph(basic_subgraph)
+    if fig is not None:
+        plt.show(block=True)
+        logger.info(f"Basic visualization debug info:\n{fig_debug_info}")
+    else:
+        logger.warning("No figure to display.")
+    logger.info("Basic Visualization window closed. Continuing with the script...")
+
+    # Advanced filtering
+    advanced_filters = {
+        "user": [
+            lambda x: torch.bincount(graph["user", "purchased", "product"].edge_index[0]) > 2
+            ,lambda x: x.user_id != "U4278"
+        ],
+        "product": [
+            lambda x: x.product_id != "P83"
+        ],
+        "category": []  # Add any category-specific filters here if needed
+    }
+
+    advanced_subgraph, advanced_debug_info = extract_subgraph_with_multiple_conditions(graph, advanced_filters)
+    logger.info(f"Advanced filtering debug info:\n{advanced_debug_info}")
+
+    fig, fig_debug_info = visualize_subgraph(advanced_subgraph)
+    if fig is not None:
+        plt.show(block=True)
+        logger.info(f"Advanced visualization debug info:\n{fig_debug_info}")
+    else:
+        logger.warning("No figure to display.")
+    logger.info("Advanced Visualization window closed. Continuing with the script...")
+
+    # Popular product analysis
+    most_popular_product = find_most_popular_product(graph)
+    users_who_purchased = find_users_who_purchased_product(graph, most_popular_product)
     
-    # Save visualizations to files
-    for analysis_type, data in analysis_results.items():
-        if 'visualization' in data and data['visualization'] is not None:
-            data['visualization'].savefig(f"{analysis_type}_visualization.png")
-            plt.close(data['visualization'])  # Close the figure to free up memory
+    logger.info(f"Most popular product: {most_popular_product}")
+    logger.info(f"Users who purchased the most popular product: {users_who_purchased}")
     
-    # Save results to a JSON file (excluding visualizations)
-    import json
-    
-    def serialize_results(obj):
-        if isinstance(obj, plt.Figure):
-            return "Figure object (not serialized)"
-        raise TypeError(f"Type {type(obj)} not serializable")
-    
-    with open("analysis_results.json", "w") as f:
-        json.dump(analysis_results, f, default=serialize_results, indent=2)
-    
-    logger.info("Analysis completed successfully.")
-    logger.info(f"Results saved to analysis_results.json")
-    logger.info(f"Visualizations saved as PNG files")
+    # Visualize subgraph of users who bought the most popular product
+    popular_product_filter = {
+        "user": [lambda x: torch.tensor([uid in users_who_purchased for uid in x.user_id])],
+        "product": [lambda x: x.product_id == most_popular_product]
+    }
+    popular_product_subgraph, popular_product_debug_info = extract_subgraph_with_multiple_conditions(graph, popular_product_filter)
+    logger.info(f"Popular product filtering debug info:\n{popular_product_debug_info}")
+
+    fig, fig_debug_info = visualize_subgraph(popular_product_subgraph)
+    if fig is not None:
+        plt.show(block=True)
+        logger.info(f"Popular product visualization debug info:\n{fig_debug_info}")
+    else:
+        logger.warning("No figure to display.")
+
+    logger.info("Popular product Visualization window closed. Script execution completed.")
