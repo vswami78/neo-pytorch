@@ -1,0 +1,21 @@
+{
+    "input_file": "user-prod-categ.csv",
+    "node_types": {
+      "user": "user_id",
+      "product": "product_id",
+      "category": "category_id"
+    },
+    "edge_types": [
+      ["user", "purchased", "product"],
+      ["product", "belongs_to", "category"]
+    ],
+    "node_color_map": {
+      "user": "red",
+      "product": "blue",
+      "category": "green"
+    },
+    "edge_color_map": {
+      "user_product": "orange",
+      "product_category": "purple"
+    }
+}

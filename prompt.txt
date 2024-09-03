@@ -149,3 +149,52 @@ Additional Considerations:
 Example Usage:
 Provide code snippets demonstrating how to use each new feature, including attribute-based filtering, popular product analysis, and multiple filter conditions.
 ```
+
+
+Enhancement-V3
+
+Enhance the heterogeneous graph analysis program to use a configuration file for input data specification:
+
+1. Design a configuration file format (e.g., JSON or YAML) that allows users to specify:
+   - Input file path
+   - Column names for each node type
+   - Edge relationships between node types
+   - Any additional metadata or parameters needed for graph construction
+
+2. Modify the main program to:
+   - Read and parse the configuration file
+   - Use the configuration to dynamically load and process the input data
+   - Create the heterogeneous graph based on the specified structure
+   - Adjust filtering and visualization functions to work with the dynamic graph structure
+
+3. Implement error checking and validation to ensure:
+   - The configuration file is well-formed and contains all necessary information
+   - The input data matches the structure specified in the configuration
+   - Graceful error handling for mismatches or missing data
+
+4. Update the visualization and analysis functions to work with the dynamic graph structure, ensuring they can adapt to different node and edge types as specified in the config file.
+
+5. Provide clear documentation and examples for users on how to create and use the configuration file with different input data formats.
+
+Ensure the resulting code is flexible enough to work with various input file structures without requiring changes to the main program, as long as the configuration file is properly set up.
+
+
+
+if __name__ == "__main__":
+    # Example data and parameters
+    data_path = "user-prod-categ.csv"
+    node_types = {
+        "user": "user_id",
+        "product": "product_id",
+        "category": "category_id"
+    }
+    edge_types = [
+        ("user", "purchased", "product"),
+        ("product", "belongs_to", "category")
+    ]
+    
+    # Run analysis
+    analysis_results, app = run_analysis(data_path, node_types, edge_types)
+    
+    # Run the Dash app
+    app.run_server(debug=True)

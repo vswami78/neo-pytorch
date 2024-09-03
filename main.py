@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 import torch
 from torch_geometric.data import HeteroData
@@ -13,10 +14,16 @@ from dash import dcc, html, callback_context
 from dash.dependencies import Input, Output, State
 import os
 import signal
-
-# Constants
-NODE_COLOR_MAP = {"user": "red", "product": "blue", "category": "green"}
-EDGE_COLOR_MAP = {("user", "product"): "orange", ("product", "category"): "purple"}
+import json
+from typing import Dict, List, Any
+# from utils import (
+#     attribute_based_filter,
+#     find_most_popular_product,
+#     find_users_who_purchased_product,
+#     visualize_subgraph,
+#     extract_subgraph,
+#     extract_subgraph_with_multiple_conditions
+# )
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -51,213 +58,81 @@ def create_heterogeneous_graph(data_path, node_types, edge_types):
     :param edge_types: List of tuples defining edge types (source, edge_type, target)
     :return: PyTorch Geometric HeteroData object
     """
+    if isinstance(data_path, HeteroData):
+        return data_path  # Return the HeteroData object directly
+    
     df = pd.read_csv(data_path)
     data = HeteroData()
     
     # Create nodes
     for node_type, id_col in node_types.items():
-        unique_ids = df[id_col].unique()
+        unique_ids = np.unique(df[id_col].to_numpy())
         data[node_type].x = torch.arange(len(unique_ids))
         data[node_type].mapping = {id: i for i, id in enumerate(unique_ids)}
         data[node_type][f'{node_type}_id'] = unique_ids  # Use specific names for each node type
     
     # Create edges
     for src_type, edge_type, dst_type in edge_types:
-        src_ids = df[node_types[src_type]].map(data[src_type].mapping)
-        dst_ids = df[node_types[dst_type]].map(data[dst_type].mapping)
+        # Use lambda functions to look up values in the mapping dictionaries
+        src_ids = df[node_types[src_type]].map(lambda x: data[src_type].mapping.get(x, -1))
+        dst_ids = df[node_types[dst_type]].map(lambda x: data[dst_type].mapping.get(x, -1))
+        
+        # Filter out any -1 values (which would be from keys not found in the mapping)
+        mask = (src_ids != -1) & (dst_ids != -1)
+        src_ids = src_ids[mask]
+        dst_ids = dst_ids[mask]
+        
         edge_index = torch.stack([torch.tensor(src_ids.values), torch.tensor(dst_ids.values)], dim=0)
         data[src_type, edge_type, dst_type].edge_index = edge_index
     
     return data
 
-def extract_subgraph(graph, filters):
-    """
-    Extract a subgraph based on user-defined filters, including only relevant products and categories.
-    
-    :param graph: PyTorch Geometric HeteroData object
-    :param filters: Dictionary of node types and their filter conditions
-    :return: Extracted subgraph, debug_info
-    """
-    node_mask = {node_type: torch.zeros(graph[node_type].num_nodes, dtype=torch.bool) for node_type in graph.node_types}
-    debug_info = DebugInfo()
-    
-    # Apply user filter
-    user_mask = filters['user'](graph['user'])
-    node_mask['user'] = user_mask
-    debug_info.add_message(f"User mask sum: {user_mask.sum().item()}")
-    
-    # Get products purchased by filtered users
-    user_product_edges = graph['user', 'purchased', 'product'].edge_index
-    filtered_user_indices = torch.where(user_mask)[0]
-    relevant_product_mask = torch.isin(user_product_edges[0], filtered_user_indices)
-    relevant_product_indices = user_product_edges[1][relevant_product_mask]
-    node_mask['product'][relevant_product_indices] = True
-    
-    # Get categories of the relevant products
-    product_category_edges = graph['product', 'belongs_to', 'category'].edge_index
-    relevant_category_mask = torch.isin(product_category_edges[0], relevant_product_indices)
-    relevant_category_indices = product_category_edges[1][relevant_category_mask]
-    node_mask['category'][relevant_category_indices] = True
-    
-    debug_info.filtered_node_counts = {nt: mask.sum().item() for nt, mask in node_mask.items()}
-    debug_info.filter_conditions = {nt: str(filters[nt]) for nt in filters}
-    debug_info.combine_method = "AND"  # Since this function doesn't support OR
-    
-    debug_info.add_message(f"Final node mask sums: {[mask.sum().item() for mask in node_mask.values()]}")
-    
-    return graph.subgraph(node_mask), debug_info
-
-def visualize_subgraph(subgraph):
-    """
-    Visualize the subgraph, highlighting only relevant user-product-category connections.
-    """
-    debug_info = DebugInfo()
-    debug_info.add_message(f"Subgraph node counts: {[subgraph[nt].num_nodes for nt in subgraph.node_types]}")
-    if subgraph['user'].num_nodes == 0:
-        debug_info.add_message("No users meet the filter condition. Nothing to display.")
-        return None, debug_info
-
-    fig, ax = plt.subplots(figsize=(12, 8))
-    G = nx.Graph()
-    
-    # Add user nodes
-    for i in range(subgraph['user'].num_nodes):
-        G.add_node(f"user_{subgraph['user'].user_id[i]}", type='user')
-
-    # Add only purchased products and their categories
-    user_product_edges = subgraph['user', 'purchased', 'product'].edge_index.t().tolist()
-    relevant_products = set()
-    for user_idx, product_idx in user_product_edges:
-        user_id = subgraph['user'].user_id[user_idx]
-        product_id = subgraph['product'].product_id[product_idx]
-        G.add_node(f"product_{product_id}", type='product')
-        G.add_edge(f"user_{user_id}", f"product_{product_id}")
-        relevant_products.add(product_idx)
-
-    # Add categories of relevant products
-    product_category_edges = subgraph['product', 'belongs_to', 'category'].edge_index.t().tolist()
-    for product_idx, category_idx in product_category_edges:
-        if product_idx in relevant_products:
-            product_id = subgraph['product'].product_id[product_idx]
-            category_id = subgraph['category'].category_id[category_idx]
-            G.add_node(f"category_{category_id}", type='category')
-            G.add_edge(f"product_{product_id}", f"category_{category_id}")
-
-    # Assign colors
-    node_colors = [NODE_COLOR_MAP[G.nodes[node]['type']] for node in G.nodes()]
-    edge_colors = [EDGE_COLOR_MAP[(G.nodes[u]['type'], G.nodes[v]['type'])] for u, v in G.edges()]
-
-    # Draw the graph
-    pos = nx.spring_layout(G, k=0.5, iterations=50)  # Adjust layout parameters
-    nx.draw(G, pos, ax=ax, node_color=node_colors, edge_color=edge_colors, with_labels=False, node_size=300)
-    
-    # Add labels with original IDs
-    labels = {node: node.split('_')[1] for node in G.nodes()}
-    nx.draw_networkx_labels(G, pos, labels, font_size=8)
-
-    # Add a legend
-    legend_elements = [plt.Line2D([0], [0], marker='o', color='w', label=f'{k.capitalize()}s',
-                                  markerfacecolor=v, markersize=10) for k, v in NODE_COLOR_MAP.items()]
-    legend_elements += [plt.Line2D([0], [0], color=v, label=f'{k[0].capitalize()}-{k[1].capitalize()}')
-                        for k, v in EDGE_COLOR_MAP.items()]
-    ax.legend(handles=legend_elements, loc='upper left', bbox_to_anchor=(1, 1))
-    
-    ax.set_title("Subgraph Visualization (Relevant Connections Only)")
-    
-    # Adjust the layout without using tight_layout
-    plt.subplots_adjust(right=0.8)  # Adjust this value as needed
-    
-    return fig, debug_info
-
-def attribute_based_filter(graph: HeteroData, node_type: str, attribute: str, value: Any) -> torch.Tensor:
-    if attribute not in graph[node_type].keys():
-        raise ValueError(f"Attribute '{attribute}' not found for node type '{node_type}'")
-    return graph[node_type][attribute] == value
-
-def find_most_popular_product(graph: HeteroData) -> str:
-    edge_index = graph["user", "purchased", "product"].edge_index
-    product_counts = torch.bincount(edge_index[1])
-    most_popular_index = torch.argmax(product_counts).item()
-    return graph["product"].product_id[most_popular_index]
-
-def find_users_who_purchased_product(graph: HeteroData, product_id: str) -> List[str]:
-    edge_index = graph["user", "purchased", "product"].edge_index
-    product_mask = graph["product"].product_id == product_id
-    product_node_index = torch.where(torch.tensor(product_mask))[0]
-    user_indices = edge_index[0][edge_index[1] == product_node_index]
-    return graph["user"].user_id[user_indices].tolist()
-
-def extract_subgraph_with_multiple_conditions(graph: HeteroData, filters: Dict[str, List[Callable]],
-                                              combine_with_or: bool = False) -> Tuple[HeteroData, DebugInfo]:
-    debug_info = DebugInfo()
-    node_mask = {node_type: torch.ones(graph[node_type].num_nodes, dtype=torch.bool)
-                 for node_type in graph.node_types}
-
-    for node_type, conditions in filters.items():
-        debug_info.add_message(f"Processing node type: {node_type}")
-        debug_info.add_message(f"Available keys: {graph[node_type].keys()}")
-        debug_info.add_message(f"Number of nodes: {graph[node_type].num_nodes}")
-        
-        if 'x' in graph[node_type]:
-            debug_info.add_message(f"Shape of x: {graph[node_type].x.shape}")
-        
-        if f'{node_type}_id' in graph[node_type]:
-            debug_info.add_message(f"First few {node_type} IDs: {graph[node_type][f'{node_type}_id'][:5]}")
-        
-        node_type_mask = torch.ones(graph[node_type].num_nodes, dtype=torch.bool)
-        for condition in conditions:
-            try:
-                condition_mask = condition(graph[node_type])
-                if combine_with_or:
-                    node_type_mask |= condition_mask
-                else:
-                    node_type_mask &= condition_mask
-            except Exception as e:
-                debug_info.add_message(f"Error applying condition: {str(e)}")
-                debug_info.add_message(f"Condition: {condition}")
-        node_mask[node_type] = node_type_mask
-
-    node_mask = {node_type: mask.bool() for node_type, mask in node_mask.items()}
-    subgraph = graph.subgraph(node_mask)
-
-    debug_info.original_node_counts = {nt: graph[nt].num_nodes for nt in graph.node_types}
-    debug_info.filtered_node_counts = {nt: subgraph[nt].num_nodes for nt in subgraph.node_types}
-    debug_info.filter_conditions = {nt: [str(cond) for cond in conditions] for nt, conditions in filters.items()}
-    debug_info.combine_method = "OR" if combine_with_or else "AND"
-
-    return subgraph, debug_info
-
-def create_interactive_subgraph(graph, filters):
+def create_interactive_subgraph(graph, filters, node_color_map, edge_color_map):
     """
     Create an interactive subgraph visualization using Plotly.
     
     :param graph: PyTorch Geometric HeteroData object
-    :param filters: Dictionary of node types and their filter conditions
+    :param filters: Dictionary of node types and their filter functions
+    :param node_color_map: Dictionary mapping node types to colors
+    :param edge_color_map: Dictionary mapping edge types to colors
     :return: Plotly Figure object
     """
-    subgraph, debug_info = extract_subgraph_with_multiple_conditions(graph, filters)
-    
     G = nx.Graph()
     
-    # Add nodes and edges
-    for node_type in subgraph.node_types:
-        for i in range(subgraph[node_type].num_nodes):
-            G.add_node(f"{node_type}_{subgraph[node_type][f'{node_type}_id'][i]}", type=node_type)
+    # Apply filters and add nodes
+    for node_type in graph.node_types:
+        filter_funcs = filters.get(node_type, [lambda x: torch.ones(x.num_nodes, dtype=torch.bool)])
+        mask = torch.ones(graph[node_type].num_nodes, dtype=torch.bool)
+        for func in filter_funcs:
+            mask &= func(graph[node_type])
+        
+        for i in range(graph[node_type].num_nodes):
+            if mask[i]:
+                node_id = graph[node_type][f'{node_type}_id'][i]
+                if hasattr(node_id, 'item'):
+                    node_id = node_id.item()
+                G.add_node(f"{node_type}_{node_id}", type=node_type)
     
-    for edge_type in subgraph.edge_types:
+    # Add edges
+    for edge_type in graph.edge_types:
         src, _, dst = edge_type
-        edge_index = subgraph[edge_type].edge_index.t().tolist()
+        edge_index = graph[edge_type].edge_index.t().tolist()
         for src_idx, dst_idx in edge_index:
-            src_id = subgraph[src][f'{src}_id'][src_idx]
-            dst_id = subgraph[dst][f'{dst}_id'][dst_idx]
-            G.add_edge(f"{src}_{src_id}", f"{dst}_{dst_id}")
+            src_id_value = graph[src][f'{src}_id'][src_idx]
+            src_id = src_id_value.item() if hasattr(src_id_value, 'item') else src_id_value
+            dst_id_value = graph[dst][f'{dst}_id'][dst_idx]
+            dst_id = dst_id_value.item() if hasattr(dst_id_value, 'item') else dst_id_value
+            src_node = f"{src}_{src_id}"
+            dst_node = f"{dst}_{dst_id}"
+            if G.has_node(src_node) and G.has_node(dst_node):
+                G.add_edge(src_node, dst_node)
     
     # Create layout
     pos = nx.spring_layout(G)
     
     # Create traces for nodes
     node_traces = {}
-    for node_type in NODE_COLOR_MAP:
+    for node_type in node_color_map:
         node_traces[node_type] = go.Scatter(
             x=[],
             y=[],
@@ -265,7 +140,7 @@ def create_interactive_subgraph(graph, filters):
             mode='markers',
             hoverinfo='text',
             marker=dict(
-                color=NODE_COLOR_MAP[node_type],
+                color=node_color_map[node_type],
                 size=10,
             ),
             name=node_type.capitalize()
@@ -273,11 +148,11 @@ def create_interactive_subgraph(graph, filters):
     
     # Create traces for edges
     edge_traces = {}
-    for edge_type in EDGE_COLOR_MAP:
+    for edge_type in edge_color_map:
         edge_traces[edge_type] = go.Scatter(
             x=[],
             y=[],
-            line=dict(width=0.5, color=EDGE_COLOR_MAP[edge_type]),
+            line=dict(width=0.5, color=edge_color_map[edge_type]),
             hoverinfo='none',
             mode='lines',
             name=f"{edge_type[0].capitalize()}-{edge_type[1].capitalize()}"
@@ -317,7 +192,8 @@ def create_interactive_subgraph(graph, filters):
     
     return fig
 
-def run_analysis(data_path: str, node_types: Dict[str, str], edge_types: List[Tuple[str, str, str]]) -> Dict[str, Any]:
+def run_analysis(data_path: str, node_types: Dict[str, str], edge_types: List[Tuple[str, str, str]], 
+                 node_color_map: Dict[str, str], edge_color_map: Dict[Tuple[str, str], str]) -> Dict[str, Any]:
     results = {}
     
     # Create heterogeneous graph
@@ -325,11 +201,10 @@ def run_analysis(data_path: str, node_types: Dict[str, str], edge_types: List[Tu
     
     # Create interactive visualization
     initial_filters = {
-        "user": [lambda x: torch.ones(x.num_nodes, dtype=torch.bool)],
-        "product": [lambda x: torch.ones(x.num_nodes, dtype=torch.bool)],
-        "category": [lambda x: torch.ones(x.num_nodes, dtype=torch.bool)]
+        node_type: [lambda x: torch.ones(x.num_nodes, dtype=torch.bool)]
+        for node_type in graph.node_types
     }
-    interactive_fig = create_interactive_subgraph(graph, initial_filters)
+    interactive_fig = create_interactive_subgraph(graph, initial_filters, node_color_map, edge_color_map)
     results['interactive_visualization'] = interactive_fig
     
     # Create Dash app
@@ -338,15 +213,6 @@ def run_analysis(data_path: str, node_types: Dict[str, str], edge_types: List[Tu
     app.layout = html.Div([
         dcc.Graph(id='subgraph-plot', figure=interactive_fig),
         html.Div([
-            html.Label('User Filter:'),
-            dcc.Dropdown(
-                id='user-filter',
-                options=[
-                    {'label': 'All Users', 'value': 'all'},
-                    {'label': 'Users with > 2 purchases', 'value': 'active'}
-                ],
-                value='all'
-            ),
             html.Label('Edge Count Filter:'),
             dcc.Slider(
                 id='edge-count-filter',
@@ -362,47 +228,111 @@ def run_analysis(data_path: str, node_types: Dict[str, str], edge_types: List[Tu
     
     @app.callback(
         Output('subgraph-plot', 'figure'),
-        [Input('user-filter', 'value'),
-         Input('edge-count-filter', 'value'),
+        [Input('edge-count-filter', 'value'),
          Input('quit-button', 'n_clicks')]
     )
-    def update_graph(user_filter, edge_count, n_clicks):
+    def update_graph(edge_count, n_clicks):
         ctx = callback_context
         if ctx.triggered and ctx.triggered[0]['prop_id'] == 'quit-button.n_clicks':
             os.kill(os.getpid(), signal.SIGINT)
             return dash.no_update
 
         filters = {
-            "user": [lambda x: torch.ones(x.num_nodes, dtype=torch.bool)],
-            "product": [lambda x: torch.ones(x.num_nodes, dtype=torch.bool)],
-            "category": [lambda x: torch.ones(x.num_nodes, dtype=torch.bool)]
+            node_type: [lambda x: torch.ones(x.num_nodes, dtype=torch.bool)]
+            for node_type in graph.node_types
         }
         
-        if user_filter == 'active':
-            filters["user"] = [lambda x: torch.bincount(graph["user", "purchased", "product"].edge_index[0]) > 2]
-        
+        # Get the first node type and edge type from the config
+        primary_node_type = next(iter(node_types.keys()))
+        primary_edge_type = edge_types[0]
+
         if edge_count > 0:
-            filters["user"].append(lambda x: torch.bincount(graph["user", "purchased", "product"].edge_index[0]) > edge_count)
+            filters[primary_node_type].append(lambda x: torch.bincount(graph[primary_edge_type].edge_index[0]) > edge_count)
         
-        return create_interactive_subgraph(graph, filters)
+        return create_interactive_subgraph(graph, filters, node_color_map, edge_color_map)
     
     return results, app
 
+def load_config(config_path: str) -> Dict[str, Any]:
+        """
+        Load and parse the configuration file.
+        
+        :param config_path: Path to the JSON configuration file
+        :return: Dictionary containing the parsed configuration
+        """
+        try:
+            with open(config_path, 'r') as config_file:
+                config = json.load(config_file)
+            
+            required_keys = ['input_file', 'node_types', 'edge_types', 'node_color_map', 'edge_color_map']
+            for key in required_keys:
+                if key not in config:
+                    raise KeyError(f"Missing required key in config: {key}")
+            
+            # Convert edge_color_map keys to tuples
+            config['edge_color_map'] = {tuple(k.split('_')): v for k, v in config['edge_color_map'].items()}
+            
+            return config
+        except json.JSONDecodeError as e:
+            logger.error(f"Error parsing config file: {e}")
+            raise
+        except KeyError as e:
+            logger.error(str(e))
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error loading config: {e}")
+            raise
+
+def validate_config(config: Dict[str, Any], df: pd.DataFrame) -> None:
+    """
+    Validate the configuration against the loaded data.
+    
+    :param config: Parsed configuration dictionary
+    :param df: Loaded DataFrame
+    """
+    # Collect all column names from node_types
+    all_columns = set()
+    for columns in config['node_types'].values():
+        if isinstance(columns, str):
+            all_columns.add(columns)
+        elif isinstance(columns, list):
+            all_columns.update(columns)
+    
+    # Check if all specified columns exist in the DataFrame
+    missing_columns = all_columns - set(df.columns)
+    if missing_columns:
+        raise ValueError(f"Columns specified in config not found in data: {missing_columns}")
+    
+    # Validate edge types
+    node_types = set(config['node_types'].keys())
+    for edge in config['edge_types']:
+        if len(edge) != 3:
+            raise ValueError(f"Invalid edge specification: {edge}. Should be [source, edge_type, target]")
+        if edge[0] not in node_types or edge[2] not in node_types:
+            raise ValueError(f"Invalid node type in edge specification: {edge}")
+
+
+
 if __name__ == "__main__":
-    # Example data and parameters
-    data_path = "user-prod-categ.csv"
-    node_types = {
-        "user": "user_id",
-        "product": "product_id",
-        "category": "category_id"
-    }
-    edge_types = [
-        ("user", "purchased", "product"),
-        ("product", "belongs_to", "category")
-    ]
+    config_path = "graph_config.json"
+    config = load_config(config_path)
+    
+    data_path = config['input_file']
+    node_types = config['node_types']
+    edge_types = [tuple(edge) for edge in config['edge_types'] if len(edge) == 3]
+    if len(edge_types) != len(config['edge_types']):
+        logger.warning("Some edge types were skipped because they didn't have exactly 3 elements.")
+
+    # Use color maps from config
+    node_color_map = config['node_color_map']
+    edge_color_map = config['edge_color_map']
+
+    # Validate config against the data
+    df = pd.read_csv(data_path)
+    validate_config(config, df)
     
     # Run analysis
-    analysis_results, app = run_analysis(data_path, node_types, edge_types)
+    analysis_results, app = run_analysis(data_path, node_types, edge_types, node_color_map, edge_color_map)
     
     # Run the Dash app
     app.run_server(debug=True)
