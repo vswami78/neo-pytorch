@@ -6,6 +6,13 @@ import matplotlib.pyplot as plt
 from typing import Any, Dict, List, Tuple, Callable
 import logging
 from dataclasses import dataclass, field
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import dash
+from dash import dcc, html, callback_context
+from dash.dependencies import Input, Output, State
+import os
+import signal
 
 # Constants
 NODE_COLOR_MAP = {"user": "red", "product": "blue", "category": "green"}
@@ -220,66 +227,166 @@ def extract_subgraph_with_multiple_conditions(graph: HeteroData, filters: Dict[s
 
     return subgraph, debug_info
 
+def create_interactive_subgraph(graph, filters):
+    """
+    Create an interactive subgraph visualization using Plotly.
+    
+    :param graph: PyTorch Geometric HeteroData object
+    :param filters: Dictionary of node types and their filter conditions
+    :return: Plotly Figure object
+    """
+    subgraph, debug_info = extract_subgraph_with_multiple_conditions(graph, filters)
+    
+    G = nx.Graph()
+    
+    # Add nodes and edges
+    for node_type in subgraph.node_types:
+        for i in range(subgraph[node_type].num_nodes):
+            G.add_node(f"{node_type}_{subgraph[node_type][f'{node_type}_id'][i]}", type=node_type)
+    
+    for edge_type in subgraph.edge_types:
+        src, _, dst = edge_type
+        edge_index = subgraph[edge_type].edge_index.t().tolist()
+        for src_idx, dst_idx in edge_index:
+            src_id = subgraph[src][f'{src}_id'][src_idx]
+            dst_id = subgraph[dst][f'{dst}_id'][dst_idx]
+            G.add_edge(f"{src}_{src_id}", f"{dst}_{dst_id}")
+    
+    # Create layout
+    pos = nx.spring_layout(G)
+    
+    # Create traces for nodes
+    node_traces = {}
+    for node_type in NODE_COLOR_MAP:
+        node_traces[node_type] = go.Scatter(
+            x=[],
+            y=[],
+            text=[],
+            mode='markers',
+            hoverinfo='text',
+            marker=dict(
+                color=NODE_COLOR_MAP[node_type],
+                size=10,
+            ),
+            name=node_type.capitalize()
+        )
+    
+    # Create traces for edges
+    edge_traces = {}
+    for edge_type in EDGE_COLOR_MAP:
+        edge_traces[edge_type] = go.Scatter(
+            x=[],
+            y=[],
+            line=dict(width=0.5, color=EDGE_COLOR_MAP[edge_type]),
+            hoverinfo='none',
+            mode='lines',
+            name=f"{edge_type[0].capitalize()}-{edge_type[1].capitalize()}"
+        )
+    
+    # Add node and edge positions to traces
+    for node in G.nodes():
+        x, y = pos[node]
+        node_type = G.nodes[node]['type']
+        node_traces[node_type]['x'] += (x,)
+        node_traces[node_type]['y'] += (y,)
+        node_traces[node_type]['text'] += (node,)
+    
+    for edge in G.edges():
+        x0, y0 = pos[edge[0]]
+        x1, y1 = pos[edge[1]]
+        edge_type = (G.nodes[edge[0]]['type'], G.nodes[edge[1]]['type'])
+        edge_traces[edge_type]['x'] += (x0, x1, None)
+        edge_traces[edge_type]['y'] += (y0, y1, None)
+    
+    # Create figure
+    fig = go.Figure(data=list(edge_traces.values()) + list(node_traces.values()))
+    fig.update_layout(
+        title="Interactive Subgraph Visualization",
+        showlegend=True,
+        hovermode='closest',
+        margin=dict(b=20,l=5,r=5,t=40),
+        annotations=[dict(
+            text="",
+            showarrow=False,
+            xref="paper", yref="paper",
+            x=0.005, y=-0.002
+        )],
+        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False)
+    )
+    
+    return fig
+
 def run_analysis(data_path: str, node_types: Dict[str, str], edge_types: List[Tuple[str, str, str]]) -> Dict[str, Any]:
     results = {}
     
     # Create heterogeneous graph
     graph = create_heterogeneous_graph(data_path, node_types, edge_types)
     
-    # Basic filtering
-    basic_filters = {
-        "user": lambda x: torch.bincount(graph["user", "purchased", "product"].edge_index[0]) > 0
+    # Create interactive visualization
+    initial_filters = {
+        "user": [lambda x: torch.ones(x.num_nodes, dtype=torch.bool)],
+        "product": [lambda x: torch.ones(x.num_nodes, dtype=torch.bool)],
+        "category": [lambda x: torch.ones(x.num_nodes, dtype=torch.bool)]
     }
-    basic_subgraph, basic_debug_info = extract_subgraph(graph, basic_filters)
-    basic_fig, basic_viz_debug_info = visualize_subgraph(basic_subgraph)
-    results['basic_filtering'] = {
-        'node_counts': {nt: basic_subgraph[nt].num_nodes for nt in basic_subgraph.node_types},
-        'debug_info': str(basic_debug_info),
-        'visualization': basic_fig,
-        'visualization_debug_info': str(basic_viz_debug_info)
-    }
-
-    # Advanced filtering
-    advanced_filters = {
-        "user": [
-            lambda x: torch.bincount(graph["user", "purchased", "product"].edge_index[0]) > 2,
-            lambda x: x.user_id != "U4278"
-        ],
-        "product": [
-            lambda x: x.product_id != "P83"
-        ],
-        "category": []
-    }
-    advanced_subgraph, advanced_debug_info = extract_subgraph_with_multiple_conditions(graph, advanced_filters)
-    advanced_fig, advanced_viz_debug_info = visualize_subgraph(advanced_subgraph)
-    results['advanced_filtering'] = {
-        'debug_info': str(advanced_debug_info),
-        'visualization': advanced_fig,
-        'visualization_debug_info': str(advanced_viz_debug_info)
-    }
-
-    # Popular product analysis
-    most_popular_product = find_most_popular_product(graph)
-    users_who_purchased = find_users_who_purchased_product(graph, most_popular_product)
-    results['popular_product_analysis'] = {
-        'most_popular_product': most_popular_product,
-        'users_who_purchased': users_who_purchased
-    }
+    interactive_fig = create_interactive_subgraph(graph, initial_filters)
+    results['interactive_visualization'] = interactive_fig
     
-    # Visualize subgraph of users who bought the most popular product
-    popular_product_filter = {
-        "user": [lambda x: torch.tensor([uid in users_who_purchased for uid in x.user_id])],
-        "product": [lambda x: x.product_id == most_popular_product]
-    }
-    popular_product_subgraph, popular_product_debug_info = extract_subgraph_with_multiple_conditions(graph, popular_product_filter)
-    popular_product_fig, popular_product_viz_debug_info = visualize_subgraph(popular_product_subgraph)
-    results['popular_product_subgraph'] = {
-        'debug_info': str(popular_product_debug_info),
-        'visualization': popular_product_fig,
-        'visualization_debug_info': str(popular_product_viz_debug_info)
-    }
+    # Create Dash app
+    app = dash.Dash(__name__)
+    
+    app.layout = html.Div([
+        dcc.Graph(id='subgraph-plot', figure=interactive_fig),
+        html.Div([
+            html.Label('User Filter:'),
+            dcc.Dropdown(
+                id='user-filter',
+                options=[
+                    {'label': 'All Users', 'value': 'all'},
+                    {'label': 'Users with > 2 purchases', 'value': 'active'}
+                ],
+                value='all'
+            ),
+            html.Label('Edge Count Filter:'),
+            dcc.Slider(
+                id='edge-count-filter',
+                min=0,
+                max=10,
+                step=1,
+                value=0,
+                marks={i: str(i) for i in range(11)}
+            )
+        ]),
+        html.Button('Quit Application', id='quit-button', n_clicks=0)
+    ])
+    
+    @app.callback(
+        Output('subgraph-plot', 'figure'),
+        [Input('user-filter', 'value'),
+         Input('edge-count-filter', 'value'),
+         Input('quit-button', 'n_clicks')]
+    )
+    def update_graph(user_filter, edge_count, n_clicks):
+        ctx = callback_context
+        if ctx.triggered and ctx.triggered[0]['prop_id'] == 'quit-button.n_clicks':
+            os.kill(os.getpid(), signal.SIGINT)
+            return dash.no_update
 
-    return results
+        filters = {
+            "user": [lambda x: torch.ones(x.num_nodes, dtype=torch.bool)],
+            "product": [lambda x: torch.ones(x.num_nodes, dtype=torch.bool)],
+            "category": [lambda x: torch.ones(x.num_nodes, dtype=torch.bool)]
+        }
+        
+        if user_filter == 'active':
+            filters["user"] = [lambda x: torch.bincount(graph["user", "purchased", "product"].edge_index[0]) > 2]
+        
+        if edge_count > 0:
+            filters["user"].append(lambda x: torch.bincount(graph["user", "purchased", "product"].edge_index[0]) > edge_count)
+        
+        return create_interactive_subgraph(graph, filters)
+    
+    return results, app
 
 if __name__ == "__main__":
     # Example data and parameters
@@ -295,28 +402,7 @@ if __name__ == "__main__":
     ]
     
     # Run analysis
-    analysis_results = run_analysis(data_path, node_types, edge_types)
+    analysis_results, app = run_analysis(data_path, node_types, edge_types)
     
-    # Here you can decide how to handle the results and visualizations
-    # For example:
-    
-    # Save visualizations to files
-    for analysis_type, data in analysis_results.items():
-        if 'visualization' in data and data['visualization'] is not None:
-            data['visualization'].savefig(f"{analysis_type}_visualization.png")
-            plt.close(data['visualization'])  # Close the figure to free up memory
-    
-    # Save results to a JSON file (excluding visualizations)
-    import json
-    
-    def serialize_results(obj):
-        if isinstance(obj, plt.Figure):
-            return "Figure object (not serialized)"
-        raise TypeError(f"Type {type(obj)} not serializable")
-    
-    with open("analysis_results.json", "w") as f:
-        json.dump(analysis_results, f, default=serialize_results, indent=2)
-    
-    logger.info("Analysis completed successfully.")
-    logger.info(f"Results saved to analysis_results.json")
-    logger.info(f"Visualizations saved as PNG files")
+    # Run the Dash app
+    app.run_server(debug=True)
