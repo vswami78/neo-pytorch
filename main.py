@@ -78,10 +78,14 @@ def create_heterogeneous_graph(data_path, node_types, edge_types):
     
     # Create nodes
     for node_type, id_col in node_types.items():
-        unique_ids = np.unique(df[id_col].to_numpy())
+        unique_ids = df[id_col].unique()
         data[node_type].x = torch.arange(len(unique_ids))
         data[node_type].mapping = {id: i for i, id in enumerate(unique_ids)}
-        data[node_type][f'{node_type}_id'] = unique_ids
+        # Store original IDs for display
+        data[node_type].original_ids = unique_ids
+        # Store hashed IDs for internal use
+        hashed_ids = np.array([hash(id) for id in unique_ids], dtype=np.int64)
+        data[node_type][f'{node_type}_id'] = torch.tensor(hashed_ids, dtype=torch.long)
         logger.info(f"Created {len(unique_ids)} {node_type} nodes")
         logger.debug(f"Sample {node_type} IDs: {unique_ids[:5]}")
     
@@ -108,23 +112,6 @@ def create_heterogeneous_graph(data_path, node_types, edge_types):
             logger.info(f"Added {edge_index.shape[1]} edges for {src_type}-{edge_type}-{dst_type}")
         else:
             logger.warning(f"No valid edges found for {src_type}-{edge_type}-{dst_type}")
-        
-        if src_type == 'user' and dst_type == 'product':
-            logger.debug("Checking for U1010-P85 relationship")
-            u1010_index = data['user'].mapping.get('U1010', -1)
-            p85_index = data['product'].mapping.get('P85', -1)
-            logger.debug(f"U1010 index: {u1010_index}, P85 index: {p85_index}")
-            if u1010_index != -1 and p85_index != -1:
-                if len(src_ids) > 0:
-                    mask = (edge_index[0] == u1010_index) & (edge_index[1] == p85_index)
-                    if mask.any():
-                        logger.info("Relationship between U1010 and P85 found in the graph")
-                    else:
-                        logger.info("Relationship between U1010 and P85 NOT found in the graph")
-                else:
-                    logger.info("No edges to check for U1010-P85 relationship")
-            else:
-                logger.info("U1010 or P85 not found in mappings")
     
     logger.info(f"Final graph node types: {data.node_types}")
     logger.info(f"Final graph edge types: {data.edge_types}")
@@ -151,24 +138,20 @@ def create_interactive_subgraph(graph, filters, node_color_map, edge_color_map):
         
         for i in range(graph[node_type].num_nodes):
             if mask[i]:
-                node_id = graph[node_type][f'{node_type}_id'][i]
-                if hasattr(node_id, 'item'):
-                    node_id = node_id.item()
+                node_id = graph[node_type][f'{node_type}_id'][i].item()
                 G.add_node(f"{node_type}_{node_id}", type=node_type)
     
     # Add edges
     for edge_type in graph.edge_types:
-        src, _, dst = edge_type
+        src, rel, dst = edge_type
         edge_index = graph[edge_type].edge_index.t().tolist()
         for src_idx, dst_idx in edge_index:
-            src_id_value = graph[src][f'{src}_id'][src_idx]
-            src_id = src_id_value.item() if hasattr(src_id_value, 'item') else src_id_value
-            dst_id_value = graph[dst][f'{dst}_id'][dst_idx]
-            dst_id = dst_id_value.item() if hasattr(dst_id_value, 'item') else dst_id_value
+            src_id = graph[src][f'{src}_id'][src_idx].item()
+            dst_id = graph[dst][f'{dst}_id'][dst_idx].item()
             src_node = f"{src}_{src_id}"
             dst_node = f"{dst}_{dst_id}"
             if G.has_node(src_node) and G.has_node(dst_node):
-                G.add_edge(src_node, dst_node)
+                G.add_edge(src_node, dst_node, type=edge_type)
     
     # Create layout
     pos = nx.spring_layout(G)
@@ -191,15 +174,17 @@ def create_interactive_subgraph(graph, filters, node_color_map, edge_color_map):
     
     # Create traces for edges
     edge_traces = {}
-    for edge_type in edge_color_map:
-        edge_traces[edge_type] = go.Scatter(
-            x=[],
-            y=[],
-            line=dict(width=0.5, color=edge_color_map[edge_type]),
-            hoverinfo='none',
-            mode='lines',
-            name=f"{edge_type[0].capitalize()}-{edge_type[1].capitalize()}"
-        )
+    for edge_type in graph.edge_types:
+        edge_key = (edge_type[0], edge_type[2])
+        if edge_key not in edge_traces:
+            edge_traces[edge_key] = go.Scatter(
+                x=[],
+                y=[],
+                line=dict(width=0.5, color=edge_color_map.get(edge_key, 'gray')),
+                hoverinfo='none',
+                mode='lines',
+                name=f"{edge_type[0].capitalize()}-{edge_type[2].capitalize()}"
+            )
     
     # Add node and edge positions to traces
     for node in G.nodes():
@@ -209,12 +194,13 @@ def create_interactive_subgraph(graph, filters, node_color_map, edge_color_map):
         node_traces[node_type]['y'] += (y,)
         node_traces[node_type]['text'] += (node,)
     
-    for edge in G.edges():
+    for edge in G.edges(data=True):
         x0, y0 = pos[edge[0]]
         x1, y1 = pos[edge[1]]
-        edge_type = (G.nodes[edge[0]]['type'], G.nodes[edge[1]]['type'])
-        edge_traces[edge_type]['x'] += (x0, x1, None)
-        edge_traces[edge_type]['y'] += (y0, y1, None)
+        edge_type = edge[2]['type']
+        edge_key = (edge_type[0], edge_type[2])
+        edge_traces[edge_key]['x'] += (x0, x1, None)
+        edge_traces[edge_key]['y'] += (y0, y1, None)
     
     # Create figure
     fig = go.Figure(data=list(edge_traces.values()) + list(node_traces.values()))

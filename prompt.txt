@@ -198,3 +198,72 @@ if __name__ == "__main__":
     
     # Run the Dash app
     app.run_server(debug=True)
+
+
+
+V5
+
+Task: Develop a Python application for interactive heterogeneous graph exploration
+
+Given:
+1. A configuration file 'graph_config.json' with the following structure:
+   {
+       "input_file": "user-prod-categ.csv",
+       "node_types": {
+         "user": "user_id",
+         "product": "product_id",
+         "category": "category_id"
+       },
+       "edge_types": [
+         ["user", "purchased", "product"],
+         ["product", "belongs_to", "category"]
+       ],
+       "node_color_map": {
+         "user": "red",
+         "product": "blue",
+         "category": "green"
+       },
+       "edge_color_map": {
+         "user_product": "orange",
+         "product_category": "purple"
+       }
+   }
+
+2. An input CSV file 'user-prod-categ.csv' containing user, product, and category data.
+
+Requirements:
+1. Create a main.py file that:
+   - Loads the configuration from 'graph_config.json'
+   - Reads the data from 'user-prod-categ.csv'
+   - Initializes and runs an interactive graph explorer
+
+2. Create an interactive_graph_explorer.py file that defines an InteractiveGraphExplorer class with the following features:
+   - Constructs a heterogeneous graph from the input data
+   - Provides an interactive Dash application for graph exploration
+   - Allows expanding the graph by clicking on nodes
+   - Visualizes the graph using plotly with customizable node and edge colors
+
+3. The InteractiveGraphExplorer class should include methods for:
+   - Initializing the graph and Dash application
+   - Creating and updating the graph visualization
+   - Expanding the graph based on user interactions
+   - Handling user input for filtering and exploration
+
+4. Implement proper error handling and logging throughout the application
+
+5. Ensure the code is well-documented and follows PEP 8 style guidelines
+
+6. The application should be efficient and able to handle reasonably large datasets
+
+Deliverables:
+1. main.py file
+2. interactive_graph_explorer.py file
+3. requirements.txt file listing all necessary dependencies
+
+Additional Considerations:
+- Ensure the application is user-friendly and provides clear instructions for interaction
+- Implement features that allow for easy extensibility, such as adding new node or edge types
+- Consider adding basic analytics features, such as degree distribution or centrality measures
+
+Example Usage:
+Provide a code snippet demonstrating how to run the application from the command line, including any necessary command-line arguments.
