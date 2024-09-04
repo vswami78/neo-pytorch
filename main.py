@@ -6,6 +6,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 from typing import Any, Dict, List, Tuple, Callable
 import logging
+from logging.handlers import RotatingFileHandler
 from dataclasses import dataclass, field
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -16,18 +17,27 @@ import os
 import signal
 import json
 from typing import Dict, List, Any
-# from utils import (
-#     attribute_based_filter,
-#     find_most_popular_product,
-#     find_users_who_purchased_product,
-#     visualize_subgraph,
-#     extract_subgraph,
-#     extract_subgraph_with_multiple_conditions
-# )
+from interactive_graph_explorer import InteractiveGraphExplorer
+import sys
 
 # Set up logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+log_file = 'graph_explorer.log'
+logging.basicConfig(level=logging.ERROR,  # Change this to control overall logging level
+                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                    handlers=[
+                        RotatingFileHandler(log_file, maxBytes=1000000, backupCount=5),
+                        logging.StreamHandler(sys.stderr)
+                    ])
+
+# # Silence other loggers
+# logging.getLogger("matplotlib").setLevel(logging.WARNING)
+# logging.getLogger("networkx").setLevel(logging.WARNING)
+# logging.getLogger("torch").setLevel(logging.WARNING)
+# logging.getLogger("dash").setLevel(logging.WARNING)
+
+# Create a logger for your application
+logger = logging.getLogger("graph_explorer")
+logger.setLevel(logging.ERROR)  # Set this to control your application's logging level
 
 @dataclass
 class DebugInfo:
@@ -62,6 +72,8 @@ def create_heterogeneous_graph(data_path, node_types, edge_types):
         return data_path  # Return the HeteroData object directly
     
     df = pd.read_csv(data_path)
+    logger.info(f"Loaded DataFrame with shape: {df.shape}")
+    logger.info(f"DataFrame columns: {df.columns}")
     data = HeteroData()
     
     # Create nodes
@@ -69,22 +81,53 @@ def create_heterogeneous_graph(data_path, node_types, edge_types):
         unique_ids = np.unique(df[id_col].to_numpy())
         data[node_type].x = torch.arange(len(unique_ids))
         data[node_type].mapping = {id: i for i, id in enumerate(unique_ids)}
-        data[node_type][f'{node_type}_id'] = unique_ids  # Use specific names for each node type
+        data[node_type][f'{node_type}_id'] = unique_ids
+        logger.info(f"Created {len(unique_ids)} {node_type} nodes")
+        logger.debug(f"Sample {node_type} IDs: {unique_ids[:5]}")
     
     # Create edges
+    logger.info(f"Edge types to create: {edge_types}")
     for src_type, edge_type, dst_type in edge_types:
-        # Use lambda functions to look up values in the mapping dictionaries
-        src_ids = df[node_types[src_type]].map(lambda x: data[src_type].mapping.get(x, -1))
-        dst_ids = df[node_types[dst_type]].map(lambda x: data[dst_type].mapping.get(x, -1))
+        logger.info(f"Creating edges for {src_type}-{edge_type}-{dst_type}")
+        src_col = node_types[src_type]
+        dst_col = node_types[dst_type]
+        logger.debug(f"Source column: {src_col}, Destination column: {dst_col}")
         
-        # Filter out any -1 values (which would be from keys not found in the mapping)
+        src_ids = df[src_col].map(lambda x: data[src_type].mapping.get(x, -1))
+        dst_ids = df[dst_col].map(lambda x: data[dst_type].mapping.get(x, -1))
+        
         mask = (src_ids != -1) & (dst_ids != -1)
         src_ids = src_ids[mask]
         dst_ids = dst_ids[mask]
         
-        edge_index = torch.stack([torch.tensor(src_ids.values), torch.tensor(dst_ids.values)], dim=0)
-        data[src_type, edge_type, dst_type].edge_index = edge_index
+        logger.info(f"Number of valid edges: {len(src_ids)}")
+        
+        if len(src_ids) > 0:
+            edge_index = torch.stack([torch.tensor(src_ids.values), torch.tensor(dst_ids.values)], dim=0)
+            data[src_type, edge_type, dst_type].edge_index = edge_index
+            logger.info(f"Added {edge_index.shape[1]} edges for {src_type}-{edge_type}-{dst_type}")
+        else:
+            logger.warning(f"No valid edges found for {src_type}-{edge_type}-{dst_type}")
+        
+        if src_type == 'user' and dst_type == 'product':
+            logger.debug("Checking for U1010-P85 relationship")
+            u1010_index = data['user'].mapping.get('U1010', -1)
+            p85_index = data['product'].mapping.get('P85', -1)
+            logger.debug(f"U1010 index: {u1010_index}, P85 index: {p85_index}")
+            if u1010_index != -1 and p85_index != -1:
+                if len(src_ids) > 0:
+                    mask = (edge_index[0] == u1010_index) & (edge_index[1] == p85_index)
+                    if mask.any():
+                        logger.info("Relationship between U1010 and P85 found in the graph")
+                    else:
+                        logger.info("Relationship between U1010 and P85 NOT found in the graph")
+                else:
+                    logger.info("No edges to check for U1010-P85 relationship")
+            else:
+                logger.info("U1010 or P85 not found in mappings")
     
+    logger.info(f"Final graph node types: {data.node_types}")
+    logger.info(f"Final graph edge types: {data.edge_types}")
     return data
 
 def create_interactive_subgraph(graph, filters, node_color_map, edge_color_map):
@@ -311,7 +354,7 @@ def validate_config(config: Dict[str, Any], df: pd.DataFrame) -> None:
         if edge[0] not in node_types or edge[2] not in node_types:
             raise ValueError(f"Invalid node type in edge specification: {edge}")
 
-
+# Usage
 
 if __name__ == "__main__":
     config_path = "graph_config.json"
@@ -331,8 +374,9 @@ if __name__ == "__main__":
     df = pd.read_csv(data_path)
     validate_config(config, df)
     
-    # Run analysis
-    analysis_results, app = run_analysis(data_path, node_types, edge_types, node_color_map, edge_color_map)
+    # Create heterogeneous graph
+    hetero_data = create_heterogeneous_graph(data_path, node_types, edge_types)
     
-    # Run the Dash app
-    app.run_server(debug=True)
+    # Create and run the InteractiveGraphExplorer
+    explorer = InteractiveGraphExplorer(hetero_data, node_color_map, edge_color_map)
+    explorer.run()

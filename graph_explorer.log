@@ -1,0 +1,64 @@
+2024-09-04 13:05:07,225 - INFO - Loaded DataFrame with shape: (1000, 3)
+2024-09-04 13:05:07,225 - INFO - DataFrame columns: Index(['user_id', 'product_id', 'category_id'], dtype='object')
+2024-09-04 13:05:07,225 - INFO - Created 947 user nodes
+2024-09-04 13:05:07,226 - INFO - Created 100 product nodes
+2024-09-04 13:05:07,226 - INFO - Created 10 category nodes
+2024-09-04 13:05:07,226 - INFO - Edge types to create: [('user', 'purchased', 'product'), ('product', 'belongs_to', 'category')]
+2024-09-04 13:05:07,226 - INFO - Creating edges for user-purchased-product
+2024-09-04 13:05:07,228 - INFO - Number of valid edges: 1000
+2024-09-04 13:05:07,228 - INFO - Added 1000 edges for user-purchased-product
+2024-09-04 13:05:07,228 - INFO - Relationship between U1010 and P85 found in the graph
+2024-09-04 13:05:07,228 - INFO - Creating edges for product-belongs_to-category
+2024-09-04 13:05:07,230 - INFO - Number of valid edges: 1000
+2024-09-04 13:05:07,230 - INFO - Added 1000 edges for product-belongs_to-category
+2024-09-04 13:05:07,230 - INFO - Final graph node types: ['user', 'product', 'category']
+2024-09-04 13:05:07,230 - INFO - Final graph edge types: [('user', 'purchased', 'product'), ('product', 'belongs_to', 'category')]
+2024-09-04 13:05:07,234 - INFO - Dash is running on http://127.0.0.1:8050/
+
+2024-09-04 13:05:08,474 - INFO - Loaded DataFrame with shape: (1000, 3)
+2024-09-04 13:05:08,474 - INFO - DataFrame columns: Index(['user_id', 'product_id', 'category_id'], dtype='object')
+2024-09-04 13:05:08,475 - INFO - Created 947 user nodes
+2024-09-04 13:05:08,475 - INFO - Created 100 product nodes
+2024-09-04 13:05:08,475 - INFO - Created 10 category nodes
+2024-09-04 13:05:08,475 - INFO - Edge types to create: [('user', 'purchased', 'product'), ('product', 'belongs_to', 'category')]
+2024-09-04 13:05:08,475 - INFO - Creating edges for user-purchased-product
+2024-09-04 13:05:08,477 - INFO - Number of valid edges: 1000
+2024-09-04 13:05:08,477 - INFO - Added 1000 edges for user-purchased-product
+2024-09-04 13:05:08,477 - INFO - Relationship between U1010 and P85 found in the graph
+2024-09-04 13:05:08,478 - INFO - Creating edges for product-belongs_to-category
+2024-09-04 13:05:08,479 - INFO - Number of valid edges: 1000
+2024-09-04 13:05:08,480 - INFO - Added 1000 edges for product-belongs_to-category
+2024-09-04 13:05:08,480 - INFO - Final graph node types: ['user', 'product', 'category']
+2024-09-04 13:05:08,480 - INFO - Final graph edge types: [('user', 'purchased', 'product'), ('product', 'belongs_to', 'category')]
+2024-09-04 13:07:12,558 - INFO - Loaded DataFrame with shape: (1000, 3)
+2024-09-04 13:07:12,558 - INFO - DataFrame columns: Index(['user_id', 'product_id', 'category_id'], dtype='object')
+2024-09-04 13:07:12,558 - INFO - Created 947 user nodes
+2024-09-04 13:07:12,559 - INFO - Created 100 product nodes
+2024-09-04 13:07:12,559 - INFO - Created 10 category nodes
+2024-09-04 13:07:12,559 - INFO - Edge types to create: [('user', 'purchased', 'product'), ('product', 'belongs_to', 'category')]
+2024-09-04 13:07:12,559 - INFO - Creating edges for user-purchased-product
+2024-09-04 13:07:12,561 - INFO - Number of valid edges: 1000
+2024-09-04 13:07:12,561 - INFO - Added 1000 edges for user-purchased-product
+2024-09-04 13:07:12,561 - INFO - Relationship between U1010 and P85 found in the graph
+2024-09-04 13:07:12,561 - INFO - Creating edges for product-belongs_to-category
+2024-09-04 13:07:12,563 - INFO - Number of valid edges: 1000
+2024-09-04 13:07:12,563 - INFO - Added 1000 edges for product-belongs_to-category
+2024-09-04 13:07:12,563 - INFO - Final graph node types: ['user', 'product', 'category']
+2024-09-04 13:07:12,563 - INFO - Final graph edge types: [('user', 'purchased', 'product'), ('product', 'belongs_to', 'category')]
+2024-09-04 13:07:12,568 - INFO - Dash is running on http://127.0.0.1:8050/
+
+2024-09-04 13:07:13,796 - INFO - Loaded DataFrame with shape: (1000, 3)
+2024-09-04 13:07:13,796 - INFO - DataFrame columns: Index(['user_id', 'product_id', 'category_id'], dtype='object')
+2024-09-04 13:07:13,796 - INFO - Created 947 user nodes
+2024-09-04 13:07:13,797 - INFO - Created 100 product nodes
+2024-09-04 13:07:13,797 - INFO - Created 10 category nodes
+2024-09-04 13:07:13,797 - INFO - Edge types to create: [('user', 'purchased', 'product'), ('product', 'belongs_to', 'category')]
+2024-09-04 13:07:13,797 - INFO - Creating edges for user-purchased-product
+2024-09-04 13:07:13,799 - INFO - Number of valid edges: 1000
+2024-09-04 13:07:13,799 - INFO - Added 1000 edges for user-purchased-product
+2024-09-04 13:07:13,799 - INFO - Relationship between U1010 and P85 found in the graph
+2024-09-04 13:07:13,799 - INFO - Creating edges for product-belongs_to-category
+2024-09-04 13:07:13,801 - INFO - Number of valid edges: 1000
+2024-09-04 13:07:13,801 - INFO - Added 1000 edges for product-belongs_to-category
+2024-09-04 13:07:13,801 - INFO - Final graph node types: ['user', 'product', 'category']
+2024-09-04 13:07:13,801 - INFO - Final graph edge types: [('user', 'purchased', 'product'), ('product', 'belongs_to', 'category')]
