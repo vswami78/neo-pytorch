@@ -1,0 +1,25 @@
+{
+    "input_file": "data/user-prod-categ-team.csv",
+    "node_types": {
+      "user": "user_id",
+      "product": "product_id",
+      "category": "category_id", 
+      "team": "team_id" 
+    },
+    "edge_types": [
+      ["user", "purchased", "product"],
+      ["product", "belongs_to", "category"],
+      ["category", "belongs_to", "team"]
+    ],
+    "node_color_map": {
+      "user": "red",
+      "product": "blue",
+      "category": "green",
+      "team": "pink"
+    },
+    "edge_color_map": {
+      "user_product": "orange",
+      "product_category": "purple",
+      "category_team": "yellow"
+    }
+}

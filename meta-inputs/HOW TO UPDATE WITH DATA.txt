@@ -1,0 +1,94 @@
+Great question! Changing the input data structure will indeed require modifications to several parts of the system. Here's a breakdown of what needs to be updated:
+
+1. **graph_config.json**
+   This is the primary place where you'll define the new structure. You'll need to update:
+   - Node types
+   - Edge types
+   - Any color mappings or other visual properties
+
+2. **create_heterogeneous_graph function**
+   ```python:core/graph_builder.py
+   def create_heterogeneous_graph(input_file, node_types, edge_types, logger):
+       # Update this function to handle the new data structure
+       # You'll need to create nodes for each new entity type
+       # and edges based on the relationships in the data
+   ```
+
+3. **InteractiveGraphExplorer class**
+   ```python:interactive_graph_explorer.py
+   class InteractiveGraphExplorer:
+       def __init__(self, hetero_data, node_color_map, edge_color_map, logger):
+           # Update to handle new node and edge types
+       
+       def run(self):
+           # Update any visualization or interaction methods
+           # to accommodate the new data structure
+   ```
+
+4. **analysis.py**
+   ```python:analysis.py
+   def run_analysis(hetero_data, logger):
+       # Update analysis methods to work with the new graph structure
+       # You might need to add new types of analysis for the new entity types
+   ```
+
+5. **main.py**
+   The main file might not need significant changes, but you should review it to ensure it's still handling everything correctly, especially if you've added any new configuration options.
+
+6. **Data loading and preprocessing**
+   If you have any separate data loading or preprocessing scripts, these will need to be updated to handle the new input format.
+
+Here's a more detailed look at what you might change in the graph_config.json:
+
+```json
+{
+  "input_file": "path/to/new_data_file.csv",
+  "node_types": [
+    "User",
+    "Team",
+    "BIN",
+    "Product",
+    "Device",
+    "IP",
+    "Address"
+  ],
+  "edge_types": [
+    ["User", "Team", "BELONGS_TO"],
+    ["User", "BIN", "USES"],
+    ["User", "Product", "PURCHASES"],
+    ["User", "Device", "OWNS"],
+    ["User", "IP", "CONNECTS_FROM"],
+    ["User", "Address", "LIVES_AT"],
+    ["Transaction", "User", "MADE_BY"],
+    ["Transaction", "Product", "INVOLVES"],
+    ["Transaction", "BIN", "PROCESSED_BY"],
+    ["Transaction", "IP", "ORIGINATED_FROM"],
+    ["Transaction", "Address", "SHIPPED_TO"]
+  ],
+  "node_color_map": {
+    "User": "blue",
+    "Team": "green",
+    "BIN": "yellow",
+    "Product": "red",
+    "Device": "purple",
+    "IP": "orange",
+    "Address": "pink",
+    "Transaction": "cyan"
+  },
+  "edge_color_map": {
+    "BELONGS_TO": "gray",
+    "USES": "brown",
+    "PURCHASES": "gold",
+    "OWNS": "silver",
+    "CONNECTS_FROM": "black",
+    "LIVES_AT": "white",
+    "MADE_BY": "lime",
+    "INVOLVES": "magenta",
+    "PROCESSED_BY": "teal",
+    "ORIGINATED_FROM": "navy",
+    "SHIPPED_TO": "maroon"
+  }
+}
+```
+
+Remember to update your data loading and graph creation logic to handle these new relationships and entity types. You may also need to adjust your visualization and analysis code to make the most of this new data structure.

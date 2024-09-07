@@ -4,13 +4,17 @@ from dash import Dash, dcc, html, Input, Output, State, callback_context, no_upd
 import torch
 from torch_geometric.data import HeteroData
 import logging
+from debug_info import DebugInfo
 
-# Set up logging
-logging.basicConfig(level=logging.ERROR, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+from graph_visualization import GraphVisualizer
+
+# # Set up logging
+# logging.basicConfig(level=logging.ERROR, format='%(asctime)s - %(levelname)s - %(message)s')
+# logger = logging.getLogger(__name__)
 
 class InteractiveGraphExplorer:
-    def __init__(self, hetero_data: HeteroData, node_color_map: dict, edge_color_map: dict):
+    def __init__(self, hetero_data: HeteroData, node_color_map: dict, edge_color_map: dict, logger: logging.Logger):
+        self.logger = logger
         self.hetero_data = hetero_data
         self.node_color_map = node_color_map
         
@@ -30,6 +34,9 @@ class InteractiveGraphExplorer:
             original_ids = self.hetero_data[node_type].original_ids
             self.reverse_mappings[node_type] = dict(zip(hashed_ids.tolist(), original_ids))
         
+        # Initialize GraphVisualizer
+        self.visualizer = GraphVisualizer(self.node_color_map, self.edge_color_map)
+        
         # Log debug information about nodes
         for node_type in self.hetero_data.node_types:
             node_ids = self.hetero_data[node_type][f'{node_type}_id']
@@ -40,6 +47,8 @@ class InteractiveGraphExplorer:
                 logger.info(f"Total number of {node_type}s: {len(node_ids)}")
             else:
                 logger.warning(f"No {node_type}s found in the graph.")
+
+        self.debug_info = DebugInfo()
 
         self.setup_layout()
 
@@ -70,6 +79,7 @@ class InteractiveGraphExplorer:
              State('seed-node-input', 'value')]
         )
         def update_graph(n_clicks, clickData, seed_node_type, seed_node_id):
+            self.logger.info(f"Updating graph for {seed_node_type} node {seed_node_id}")
             ctx = callback_context
             if not ctx.triggered:
                 return self.create_graph_figure()
@@ -99,10 +109,12 @@ class InteractiveGraphExplorer:
 
     def create_networkx_graph(self, seed_node_type, seed_node_id):
         self.G.clear()
+        self.logger.info(f"Creating NetworkX graph for {seed_node_type} node {seed_node_id}")
+
         hashed_seed_id = hash(seed_node_id)
         seed_index = (self.hetero_data[seed_node_type][f'{seed_node_type}_id'] == hashed_seed_id).nonzero(as_tuple=True)[0]
         if len(seed_index) == 0:
-            logger.warning(f"Seed node ID {seed_node_id} not found in {seed_node_type}")
+            self.logger.warning(f"Seed node ID {seed_node_id} not found in {seed_node_type}")
             return
         seed_index = seed_index[0].item()
         self.G.add_node(f"{seed_node_type}_{seed_node_id}", type=seed_node_type)
@@ -132,61 +144,7 @@ class InteractiveGraphExplorer:
                     self.G.add_edge(src_node, f"{seed_node_type}_{seed_node_id}", type=edge_type)
 
     def create_graph_figure(self):
-        pos = nx.spring_layout(self.G)
-        
-        node_traces = {}
-        for node_type, color in self.node_color_map.items():
-            node_traces[node_type] = go.Scatter(
-                x=[],
-                y=[],
-                text=[],
-                mode='markers',
-                hoverinfo='text',
-                marker=dict(color=color, size=10),
-                name=node_type.capitalize(),
-                customdata=[]
-            )
-
-        edge_traces = {}
-        for edge_type in self.hetero_data.edge_types:
-            src, rel, dst = edge_type
-            edge_key = f"{src}_{dst}"
-            edge_traces[edge_key] = go.Scatter(
-                x=[],
-                y=[],
-                line=dict(width=0.5, color=self.edge_color_map.get((src, dst), 'gray')),
-                hoverinfo='none',
-                mode='lines',
-                name=f"{src.capitalize()}-{dst.capitalize()}"
-            )
-
-        for node in self.G.nodes(data=True):
-            x, y = pos[node[0]]
-            node_type = node[1]['type']
-            node_traces[node_type]['x'] += (x,)
-            node_traces[node_type]['y'] += (y,)
-            node_traces[node_type]['text'] += (node[0],)
-            node_traces[node_type]['customdata'] += (node[0],)
-
-        for edge in self.G.edges(data=True):
-            x0, y0 = pos[edge[0]]
-            x1, y1 = pos[edge[1]]
-            edge_type = edge[2].get('type', ('unknown', 'unknown', 'unknown'))
-            edge_key = f"{edge_type[0]}_{edge_type[2]}"
-            if edge_key in edge_traces:
-                edge_traces[edge_key]['x'] += (x0, x1, None)
-                edge_traces[edge_key]['y'] += (y0, y1, None)
-
-        fig = go.Figure(data=list(edge_traces.values()) + list(node_traces.values()))
-        fig.update_layout(
-            showlegend=True,
-            hovermode='closest',
-            margin=dict(b=20,l=5,r=5,t=40),
-            xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-            yaxis=dict(showgrid=False, zeroline=False, showticklabels=False)
-        )
-
-        return fig
+        return self.visualizer.create_interactive_subgraph(self.G, self.hetero_data)
 
     def expand_graph(self, node_type, node_id):
         node_key = f"{node_type}_{node_id}"
@@ -227,10 +185,6 @@ class InteractiveGraphExplorer:
                         src_node = f"{src}_{src_id}"
                         self.G.add_node(src_node, type=src)
                         self.G.add_edge(src_node, node_key, type=edge_type)
-
-    def update_graph_figure(self):
-        self.fig = self.create_graph_figure()
-        self.fig_widget.update(self.fig)
 
     def run(self):
         self.app.run_server(debug=True)

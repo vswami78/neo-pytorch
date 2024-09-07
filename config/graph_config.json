@@ -1,5 +1,5 @@
 {
-    "input_file": "user-prod-categ.csv",
+    "input_file": "data/user-prod-categ.csv",
     "node_types": {
       "user": "user_id",
       "product": "product_id",
