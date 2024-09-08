@@ -7,58 +7,105 @@ class GraphVisualizer:
         self.edge_color_map = edge_color_map
 
     def create_interactive_subgraph(self, G, hetero_data):
+        if len(G.edges()) == 0:
+            return self._create_empty_figure()
+
         pos = nx.spring_layout(G)
+        edge_traces = self._create_edge_traces(G, pos, hetero_data)
+        node_traces = self._create_node_traces(G, pos)
         
-        node_traces = {}
-        for node_type, color in self.node_color_map.items():
-            node_traces[node_type] = go.Scatter(
-                x=[],
-                y=[],
-                text=[],
-                mode='markers',
-                hoverinfo='text',
-                marker=dict(color=color, size=10),
-                name=node_type.capitalize(),
-                customdata=[]
-            )
+        scatter_traces = self._create_scatter_traces(edge_traces, node_traces)
+        
+        return go.Figure(data=scatter_traces, layout=self._create_layout())
 
+    def _create_empty_figure(self):
+        return go.Figure(layout=go.Layout(
+            showlegend=False,
+            hovermode='closest',
+            margin=dict(b=0,l=0,r=0,t=0),
+            xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+            yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+            annotations=[
+                dict(
+                    text="No data to display yet. Please interact to populate the graph.",
+                    showarrow=False,
+                    xref="paper",
+                    yref="paper",
+                    x=0.5,
+                    y=0.5,
+                    font=dict(size=14)
+                )
+            ]
+        ))
+
+    def _create_edge_traces(self, G, pos, hetero_data):
         edge_traces = {}
-        for edge_type in hetero_data.edge_types:
-            src, rel, dst = edge_type
-            edge_key = f"{src}_{dst}"
-            edge_traces[edge_key] = go.Scatter(
-                x=[],
-                y=[],
-                line=dict(width=0.5, color=self.edge_color_map.get((src, dst), 'gray')),
-                hoverinfo='none',
-                mode='lines',
-                name=f"{src.capitalize()}-{dst.capitalize()}"
-            )
-
-        for node in G.nodes(data=True):
-            x, y = pos[node[0]]
-            node_type = node[1]['type']
-            node_traces[node_type]['x'] += (x,)
-            node_traces[node_type]['y'] += (y,)
-            node_traces[node_type]['text'] += (node[0],)
-            node_traces[node_type]['customdata'] += (node[0],)
-
         for edge in G.edges(data=True):
             x0, y0 = pos[edge[0]]
             x1, y1 = pos[edge[1]]
-            edge_type = edge[2].get('type', ('unknown', 'unknown', 'unknown'))
-            edge_key = f"{edge_type[0]}_{edge_type[2]}"
-            if edge_key in edge_traces:
-                edge_traces[edge_key]['x'] += (x0, x1, None)
-                edge_traces[edge_key]['y'] += (y0, y1, None)
+            edge_type = edge[2]['type']
+            if edge_type not in edge_traces:
+                edge_traces[edge_type] = {
+                    'x': [],
+                    'y': [],
+                    'color': self.edge_color_map.get(edge_type, '#888'),
+                    'name': f"{edge_type[0].capitalize()}-{edge_type[1].capitalize()}" if isinstance(edge_type, tuple) else str(edge_type)
+                }
+            edge_traces[edge_type]['x'].extend([x0, x1, None])
+            edge_traces[edge_type]['y'].extend([y0, y1, None])
+        return edge_traces
 
-        fig = go.Figure(data=list(edge_traces.values()) + list(node_traces.values()))
-        fig.update_layout(
+    def _create_node_traces(self, G, pos):
+        node_traces = {}
+        for node, node_data in G.nodes(data=True):
+            x, y = pos[node]
+            node_type = node_data['type']
+            if node_type not in node_traces:
+                node_traces[node_type] = {
+                    'x': [],
+                    'y': [],
+                    'text': [],
+                    'customdata': []
+                }
+            node_traces[node_type]['x'].append(x)
+            node_traces[node_type]['y'].append(y)
+            node_traces[node_type]['text'].append(f"{node_type}: {node}")
+            node_traces[node_type]['customdata'].append(node)
+        return node_traces
+
+    def _create_scatter_traces(self, edge_traces, node_traces):
+        scatter_traces = []
+        for edge_type, edge_data in edge_traces.items():
+            scatter_traces.append(go.Scatter(
+                x=edge_data['x'],
+                y=edge_data['y'],
+                line=dict(width=0.5, color=edge_data['color']),
+                hoverinfo='none',
+                mode='lines',
+                name=edge_data['name']
+            ))
+        for node_type, node_data in node_traces.items():
+            scatter_traces.append(go.Scatter(
+                x=node_data['x'],
+                y=node_data['y'],
+                mode='markers',
+                hoverinfo='text',
+                marker=dict(
+                    color=self.node_color_map[node_type],
+                    size=10,
+                    line_width=2
+                ),
+                text=node_data['text'],
+                customdata=node_data['customdata'],
+                name=node_type.capitalize()
+            ))
+        return scatter_traces
+
+    def _create_layout(self):
+        return go.Layout(
             showlegend=True,
             hovermode='closest',
-            margin=dict(b=20,l=5,r=5,t=40),
+            margin=dict(b=0,l=0,r=0,t=0),
             xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
             yaxis=dict(showgrid=False, zeroline=False, showticklabels=False)
         )
-
-        return fig

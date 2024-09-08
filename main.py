@@ -33,12 +33,12 @@ if __name__ == "__main__":
     config_manager = ConfigManager(config_path)
     config = config_manager.load_and_validate()
 
-    hetero_data = create_heterogeneous_graph(config.input_file, config.node_types, config.edge_types, logger)
+    hetero_data = create_heterogeneous_graph(config, logger)
     
     # Run analysis (if needed)
     # results, app = run_analysis(data_path, node_types, edge_types, node_color_map, edge_color_map, logger)
     # app.run_server(debug=True)
 
     # Create and run the InteractiveGraphExplorer
-    explorer = InteractiveGraphExplorer(hetero_data, config.node_color_map, config.edge_color_map, logger)
+    explorer = InteractiveGraphExplorer(hetero_data, config, logger)
     explorer.run()
