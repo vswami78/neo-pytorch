@@ -10,7 +10,11 @@ class InteractiveGraphExplorer:
         self.logger = logger
         self.config = config
         self.graph_manager = GraphManager(hetero_data, config, logger)
-        self.visualizer = GraphVisualizer(config.node_color_map, self._process_edge_color_map())
+        self.visualizer = GraphVisualizer(
+            config.node_color_map, 
+            self._process_edge_color_map(),
+            self._process_edge_width_map()  # Add this line
+        )
         self.app = Dash(__name__)
         self.setup_layout()
 
@@ -18,6 +22,12 @@ class InteractiveGraphExplorer:
         return {
             k if isinstance(k, tuple) else tuple(k.split('_')): v 
             for k, v in self.config.edge_color_map.items()
+        }
+
+    def _process_edge_width_map(self):
+        return {
+            k if isinstance(k, tuple) else tuple(k.split('_')): v 
+            for k, v in self.config.edge_width_map.items()
         }
 
     def setup_layout(self):

@@ -28,7 +28,7 @@ def setup_logging():
 
 if __name__ == "__main__":
     logger = setup_logging()
-    config_path = "config/graph_config_v2.json"
+    config_path = "config/graph_config_v3.json"
 
     config_manager = ConfigManager(config_path)
     config = config_manager.load_and_validate()

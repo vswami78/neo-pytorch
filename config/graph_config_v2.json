@@ -21,5 +21,8 @@
       "user_product": "orange",
       "product_category": "purple",
       "category_team": "yellow"
+    },
+    "edge_width_map": {
+      "category_team": 3
     }
 }

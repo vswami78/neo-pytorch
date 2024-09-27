@@ -1,0 +1,48 @@
+{
+    "input_file": "data/transaction-network.csv",
+    "node_types": {
+      "case": "case_id",
+      "user": "user_id",
+      "IP": "IP_id",
+      "baddress": "BAddress_id",
+      "daddress": "DAddress_id",
+      "device": "device_id",
+      "amount": "amount",
+      "team": "team_id",
+      "status": "status",
+      "product": "product_id",
+      "bin": "BIN_id"
+    },
+    "edge_types": [
+      ["case", "assigned_to", "user"],
+      ["case", "judged_as", "status"],
+      ["case", "assigned_to", "team"],
+      ["device", "belongs_to", "user"],      
+      ["IP", "belongs_to", "user"],
+      ["baddress", "belongs_to", "user"],
+      ["daddress", "belongs_to", "user"],
+      ["user", "purchased", "product"],
+      ["bin", "belongs_to", "user"]
+    ],
+    "node_color_map": {
+      "case": "red",
+      "user": "blue",
+      "IP": "green",
+      "baddress": "pink",
+      "daddress": "orange",
+      "device": "purple",
+      "amount": "yellow",
+      "team": "gray",
+      "status": "gray",
+      "product": "brown",
+      "bin": "black"
+    },
+    "edge_color_map": {
+      "user_product": "blue"
+    },
+    "edge_width_map": {
+      "user_device": 2
+    }
+}
+
+

@@ -10,7 +10,9 @@ class Config:
     edge_types: List[Tuple[str, str, str]]
     node_color_map: Dict[str, str]
     edge_color_map: Dict[str, str]
+    edge_width_map: Dict[str, float]  # Add this line
     default_edge_color: str = "#888888"
+    default_edge_width: float = 1.0  # Add this line if you want a default width
 
 class ConfigManager:
     def __init__(self, config_path: str):
@@ -43,7 +45,7 @@ class ConfigManager:
         self._validate_against_data()
 
     def _check_required_keys(self):
-        required_keys = ['input_file', 'node_types', 'edge_types', 'node_color_map', 'edge_color_map']
+        required_keys = ['input_file', 'node_types', 'edge_types', 'node_color_map', 'edge_color_map', 'edge_width_map']  # Add 'edge_width_map'
         for key in required_keys:
             if key not in self.raw_config:
                 raise ValueError(f"Missing required key in config: {key}")
@@ -89,6 +91,9 @@ class ConfigManager:
             if edge_key not in self.raw_config['edge_color_map']:
                 self.raw_config['edge_color_map'][edge_key] = self.raw_config.get('default_edge_color', "#888888")
                 print(f"Warning: Using default color for edge type: {edge_key}")
+            if edge_key not in self.raw_config['edge_width_map']:
+                self.raw_config['edge_width_map'][edge_key] = self.raw_config.get('default_edge_width', 1.0)
+                print(f"Warning: Using default width for edge type: {edge_key}")
 
     def _process_config(self):
         """Process and create the final Config object."""

@@ -2,9 +2,10 @@ import networkx as nx
 import plotly.graph_objects as go
 
 class GraphVisualizer:
-    def __init__(self, node_color_map, edge_color_map):
+    def __init__(self, node_color_map, edge_color_map, edge_width_map):
         self.node_color_map = node_color_map
         self.edge_color_map = edge_color_map
+        self.edge_width_map = edge_width_map  # Add this line
 
     def create_interactive_subgraph(self, G, hetero_data):
         if len(G.edges()) == 0:
@@ -49,6 +50,7 @@ class GraphVisualizer:
                     'x': [],
                     'y': [],
                     'color': self.edge_color_map.get(edge_type, '#888'),
+                    'width': self.edge_width_map.get(edge_type, 0.5),  # Add this line
                     'name': f"{edge_type[0].capitalize()}-{edge_type[1].capitalize()}" if isinstance(edge_type, tuple) else str(edge_type)
                 }
             edge_traces[edge_type]['x'].extend([x0, x1, None])
@@ -79,7 +81,7 @@ class GraphVisualizer:
             scatter_traces.append(go.Scatter(
                 x=edge_data['x'],
                 y=edge_data['y'],
-                line=dict(width=0.5, color=edge_data['color']),
+                line=dict(width=edge_data['width'], color=edge_data['color']),  # Modified this line
                 hoverinfo='none',
                 mode='lines',
                 name=edge_data['name']
