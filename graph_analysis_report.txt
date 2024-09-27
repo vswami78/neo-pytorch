@@ -1,0 +1,62 @@
+Graph Analysis Report
+=====================
+
+Total number of nodes: 166377
+Total number of edges: 450000
+
+Node Type Distribution:
+  case: 50000
+  user: 21615
+  IP: 9936
+  baddress: 9929
+  daddress: 9929
+  device: 9933
+  amount: 48832
+  team: 200
+  status: 3
+  product: 5000
+  bin: 1000
+
+Edge Type Distribution:
+  ('case', 'assigned_to', 'user'): 50000
+  ('case', 'judged_as', 'status'): 50000
+  ('case', 'assigned_to', 'team'): 50000
+  ('device', 'belongs_to', 'user'): 50000
+  ('IP', 'belongs_to', 'user'): 50000
+  ('baddress', 'belongs_to', 'user'): 50000
+  ('daddress', 'belongs_to', 'user'): 50000
+  ('user', 'purchased', 'product'): 50000
+  ('bin', 'belongs_to', 'user'): 50000
+
+Average Degree:
+  case: 1.00
+  user: 2.31
+  IP: 5.03
+  baddress: 5.04
+  daddress: 5.04
+  device: 5.03
+  bin: 50.00
+
+Degree Distribution Summary:
+  case_out:
+    Min: 1, Max: 1, Median: 1
+  user_in:
+    Min: 1, Max: 10, Median: 2
+  status_in:
+    Min: 16548, Max: 16903, Median: 16549
+  team_in:
+    Min: 209, Max: 297, Median: 249
+  device_out:
+    Min: 1, Max: 17, Median: 5
+  IP_out:
+    Min: 1, Max: 15, Median: 5
+  baddress_out:
+    Min: 1, Max: 16, Median: 5
+  daddress_out:
+    Min: 1, Max: 16, Median: 5
+  user_out:
+    Min: 1, Max: 10, Median: 2
+  product_in:
+    Min: 1, Max: 24, Median: 10
+  bin_out:
+    Min: 30, Max: 78, Median: 50

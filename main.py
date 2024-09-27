@@ -5,7 +5,9 @@ import sys
 from config_manager import ConfigManager
 from core.graph_builder import create_heterogeneous_graph
 from interactive_graph_explorer import InteractiveGraphExplorer
-from analysis import run_analysis
+# from analysis import run_analysis
+from graph_analysis import analyze_graph, generate_analysis_report
+
 
 def setup_logging():
     log_file = 'graph_explorer.log'
@@ -35,9 +37,16 @@ if __name__ == "__main__":
 
     hetero_data = create_heterogeneous_graph(config, logger)
     
-    # Run analysis (if needed)
-    # results, app = run_analysis(data_path, node_types, edge_types, node_color_map, edge_color_map, logger)
-    # app.run_server(debug=True)
+    # Perform graph analysis
+    analysis_results = analyze_graph(hetero_data)
+    analysis_report = generate_analysis_report(analysis_results)
+    
+    # Print the analysis report
+    print(analysis_report)
+    
+    # Optionally, save the report to a file
+    with open("graph_analysis_report.txt", "w") as f:
+        f.write(analysis_report)
 
     # Create and run the InteractiveGraphExplorer
     explorer = InteractiveGraphExplorer(hetero_data, config, logger)
