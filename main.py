@@ -66,12 +66,17 @@ def sample_device_cases(hetero_data, config, min_users, max_users):
     # Get the device-user relationships
     edge_index = hetero_data[('device', 'belongs_to', 'user')].edge_index
     
-    # Count the number of users per device
-    unique_devices, counts = edge_index[0].unique(return_counts=True)
+    # Count the number of unique users per device
+    unique_devices, inverse_indices = edge_index[0].unique(return_inverse=True)
+    unique_users = edge_index[1].unique()
     
-    # Filter devices with user count between min_users and max_users
-    filtered_devices = [(device.item(), count.item()) for device, count in zip(unique_devices, counts) 
-                        if min_users < count.item() <= max_users]
+    device_to_users = {device.item(): set() for device in unique_devices}
+    for device_idx, user_idx in zip(inverse_indices, edge_index[1]):
+        device_to_users[unique_devices[device_idx].item()].add(user_idx.item())
+    
+    # Filter devices with unique user count between min_users and max_users
+    filtered_devices = [(device, len(users)) for device, users in device_to_users.items() 
+                        if min_users < len(users) <= max_users]
     
     # Sample up to 10 devices
     sampled_devices = random.sample(filtered_devices, min(10, len(filtered_devices)))
